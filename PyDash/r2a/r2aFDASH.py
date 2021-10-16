@@ -17,6 +17,8 @@ before sending the message down.
 
 from player.parser import *
 from r2a.ir2a import IR2A
+from math import sqrt
+from time import perf_counter
 
 class R2AFDASH(IR2A):
 
@@ -25,12 +27,12 @@ class R2AFDASH(IR2A):
         self.parsed_mpd = ''
         self.qi = []
 
-        # FDASH Parameters
-        self.N2 = 0.25
-        self.N1 = 0.5
-        self.Z = 1
-        self.N2 = 1.5
-        self.N2 = 2
+        self.bitrates = []
+        self.time_request = 0
+        self.rates = [46980, 91917, 135410, 182366, 226106, 270316, 352546, 424520, 537825, 620705, 808057, 1071529, 1312787, 1662809, 2234145, 2617284, 3305118, 3841983, 4242923, 4726737]
+        self.previous_qi = 0
+        self.next_qi = 0
+
         self.iterator = 0
         self.T = 5
         self.short = 0
@@ -40,7 +42,11 @@ class R2AFDASH(IR2A):
         self.falling = 0
         self.steady = 0
         self.rising = 0
-        self.previous_buffering_time = 0
+        self.p2 = 0
+        self.p1 = 0
+        self.z  = 0
+        self.n1 = 0
+        self.n2 = 0
         self.r1 = 0
         self.r2 = 0
         self.r3 = 0
@@ -52,12 +58,16 @@ class R2AFDASH(IR2A):
         self.r9 = 0
 
     def handle_xml_request(self, msg):
+        self.time_request = perf_counter()
         self.send_down(msg)
 
     def handle_xml_response(self, msg):
         # getting qi list
         self.parsed_mpd = parse_mpd(msg.get_payload())
         self.qi = self.parsed_mpd.get_qi()
+
+        time_download = perf_counter() - self.time_request
+        self.bitrates.append(msg.get_bit_length() / time_download)
 
         self.send_up(msg)
 
@@ -71,21 +81,24 @@ class R2AFDASH(IR2A):
         self.falling = 0
         self.steady = 0
         self.rising = 0
-        # captar buferring time atual e printar
-        self.buffering_time = self.whiteboard.get_amount_video_to_play()
-        print("buffering_time: "+str(self.buffering_time))
+        self.p2 = 0
+        self.p1 = 0
+        self.z  = 0
+        self.n1 = 0
+        self.n2 = 0
 
-        print("previous buffering_time: "+str(self.previous_buffering_time))
+        self.currDt = self.get_buffer_estimate()
+        print(f"currDt: {self.currDt}")
 
         # fuzzification para definir variaveis short, close e long
-        if self.buffering_time < 2*self.T/3:
+        if self.currDt < 2*self.T/3:
             self.short = 1
-        elif self.buffering_time >= 2*self.T/3 and self.buffering_time < self.T:
-            self.short = 1 - (1/(self.T/3)*(self.buffering_time - (2*self.T/3)))
-            self.close = (1/(self.T/3)) * (self.buffering_time-(2*self.T/3))
-        elif self.buffering_time >= self.T and self.buffering_time < 4*self.T:
-            self.close = 1-1/(3*self.T)*(self.buffering_time-self.T)
-            self.longg = 1/(3*self.T)*(self.buffering_time-self.T)
+        elif self.currDt >= 2*self.T/3 and self.currDt < self.T:
+            self.short = 1 - (1/(self.T/3)*(self.currDt - (2*self.T/3)))
+            self.close = (1/(self.T/3)) * (self.currDt-(2*self.T/3))
+        elif self.currDt >= self.T and self.currDt < 4*self.T:
+            self.close = 1-1/(3*self.T)*(self.currDt-self.T)
+            self.longg = 1/(3*self.T)*(self.currDt-self.T)
         else:
             self.longg = 1
 
@@ -93,14 +106,11 @@ class R2AFDASH(IR2A):
         print("close: " + str(self.close))
         print("long: " + str(self.longg))
 
-        print("buffering_time: "+str(self.buffering_time))
-        print("previous buffering_time: "+str(self.previous_buffering_time))
         # define differential buffering time
-        self.differential = self.buffering_time - self.previous_buffering_time
-        print("differential: "+str(self.differential))
+        self.differential = self.get_buffer_differential()
+        print(f"differential: {self.differential}")
         # fuzzification para definir variaveis falling, steady e rising
 
-        #print("T: "+str(self.T))
         if self.differential < -2*self.T/3:
             self.falling = 1
         elif self.differential >= -2*self.T/3 and self.differential < 0:
@@ -126,10 +136,53 @@ class R2AFDASH(IR2A):
         self.r8 = min(self.close, self.rising)
         self.r9 = min(self.longg, self.rising)
 
-        # captar buferring time anterior e printar após primeiro ciclo
-        self.previous_buffering_time = self.buffering_time
+        self.p2 = sqrt((self.r9 * self.r9))
+        self.p1 = sqrt((self.r6 * self.r6) + (self.r8 * self.r8))
+        self.z  = sqrt((self.r3 * self.r3) + (self.r5 * self.r5) + (self.r7 * self.r7))
+        self.n1 = sqrt((self.r2 * self.r2) + (self.r4 * self.r4))
+        self.n2 = sqrt((self.r1 * self.r1))
 
-        msg.add_quality_id(self.qi[1])
+        output = (self.n2 * 0.25 + self.n1 * 0.5 + self.z * 1 + self.p1 * 1.5 + self.p2 * 2) / (self.n2 + self.n1 + self.z + self.p1 + self.p2)
+
+        print(f"short = {self.short}, close = {self.close}, falling = {self.falling}, rising = {self.rising}," +
+        "steady = {self.steady}, r1 = {self.r1}, r2 = {self.r2}, r3 = {self.r3}, r4 = {self.r4}," + 
+        " r5 = {self.r5}, r6 = {self.r6}, r7 = {self.r7}, r8 = {self.r8}, r9 = {self.r9}, p2 = {self.p2}," +
+        " p1 = {self.p1}, z = {self.z}, n1 = {self.n1}, n2 = {self.n2}")
+
+        bitrate_estimate = sum(self.bitrates)/len(self.bitrates)
+        interruption_limit = 4726737
+
+        result = output * bitrate_estimate
+
+        if (result > interruption_limit):
+            result = interruption_limit
+
+        self.next_qi = 0
+
+        for i in range(len(self.rates)):
+            if result > self.rates[i]:
+                self.next_qi = i
+
+        if self.next_qi > self.previous_qi:
+            t_60 = self.currDt + (bitrate_estimate / self.rates[self.next_qi] - 1) * 60
+
+            if t_60 < self.T:
+                self.next_qi = self.previous_qi
+
+        elif self.next_qi < self.previous_qi and interruption_limit == self.rates[-1]:
+            t_60 = self.currDt + (bitrate_estimate / self.rates[self.next_qi] - 1) * 60
+
+            if t_60 > self.T:
+                t_60 = self.currDt + (bitrate_estimate / self.rates[self.previous_qi] - 1) * 60
+                
+                if t_60 > self.T:
+                    self.next_qi = self.previous_qi
+
+        print(f"Next QI = {self.next_qi}")
+        
+        self.previous_qi = self.next_qi
+
+        msg.add_quality_id(self.qi[self.next_qi])
         self.send_down(msg)
 
     def handle_segment_size_response(self, msg):
@@ -140,3 +193,24 @@ class R2AFDASH(IR2A):
 
     def finalization(self):
         pass
+
+    def get_buffer_estimate(self):
+        pssab = list(self.whiteboard.get_playback_segment_size_time_at_buffer())
+
+        if len(pssab) == 0:
+            return 0
+
+        soma = 0
+
+        for element in pssab:
+            soma += float(element)
+
+        return soma/len(pssab)
+
+    def get_buffer_differential(self):
+        pssab = list(self.whiteboard.get_playback_segment_size_time_at_buffer())
+
+        if (len(pssab) < 2):
+            return 0
+
+        return float(pssab[-1] - pssab[-2])
