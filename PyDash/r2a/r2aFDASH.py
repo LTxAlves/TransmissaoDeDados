@@ -145,9 +145,9 @@ class R2AFDASH(IR2A):
         output = (self.n2 * 0.25 + self.n1 * 0.5 + self.z * 1 + self.p1 * 1.5 + self.p2 * 2) / (self.n2 + self.n1 + self.z + self.p1 + self.p2)
 
         print(f"short = {self.short}, close = {self.close}, falling = {self.falling}, rising = {self.rising}," +
-        "steady = {self.steady}, r1 = {self.r1}, r2 = {self.r2}, r3 = {self.r3}, r4 = {self.r4}," + 
-        " r5 = {self.r5}, r6 = {self.r6}, r7 = {self.r7}, r8 = {self.r8}, r9 = {self.r9}, p2 = {self.p2}," +
-        " p1 = {self.p1}, z = {self.z}, n1 = {self.n1}, n2 = {self.n2}")
+        f" steady = {self.steady}, r1 = {self.r1}, r2 = {self.r2}, r3 = {self.r3}, r4 = {self.r4}," + 
+        f" r5 = {self.r5}, r6 = {self.r6}, r7 = {self.r7}, r8 = {self.r8}, r9 = {self.r9}, p2 = {self.p2}," +
+        f" p1 = {self.p1}, z = {self.z}, n1 = {self.n1}, n2 = {self.n2}")
 
         bitrate_estimate = sum(self.bitrates)/len(self.bitrates)
         interruption_limit = 4726737
@@ -178,8 +178,6 @@ class R2AFDASH(IR2A):
                 if t_60 > self.T:
                     self.next_qi = self.previous_qi
 
-        print(f"Next QI = {self.next_qi}")
-        
         self.previous_qi = self.next_qi
 
         msg.add_quality_id(self.qi[self.next_qi])
