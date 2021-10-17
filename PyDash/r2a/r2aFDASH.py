@@ -27,27 +27,36 @@ class R2AFDASH(IR2A):
         self.parsed_mpd = ''
         self.qi = []
 
+        #variables for calculating throughput
         self.bitrates = []
         self.time_request = 0
-        self.rates = [46980, 91917, 135410, 182366, 226106, 270316, 352546, 424520, 537825, 620705, 808057, 1071529, 1312787, 1662809, 2234145, 2617284, 3305118, 3841983, 4242923, 4726737]
-        self.interruption_limit = self.rates[-1]
+
+        #max value of rates
+        self.interruption_limit = 0
+
+        #keeping selected QI
         self.previous_qi = 0
         self.next_qi = 0
 
-        self.iterator = 0
-        self.T = 10
+        self.T = 5
         self.differential = 0
+
+        #buffering time linguistic variables
         self.short = 0
         self.close = 0
         self.longg = 0
         self.falling = 0
         self.steady = 0
         self.rising = 0
+
+        #factors of the output membership functions
         self.p2 = 0
         self.p1 = 0
         self.z  = 0
         self.n1 = 0
         self.n2 = 0
+
+        #variables for rules 1 through 9
         self.r1 = 0
         self.r2 = 0
         self.r3 = 0
@@ -66,6 +75,7 @@ class R2AFDASH(IR2A):
         # getting qi list
         self.parsed_mpd = parse_mpd(msg.get_payload())
         self.qi = self.parsed_mpd.get_qi()
+        self.interruption_limit = self.qi[-1]
 
         time_download = perf_counter() - self.time_request
         self.bitrates.append(msg.get_bit_length() / time_download)
@@ -116,6 +126,7 @@ class R2AFDASH(IR2A):
         else:
             self.rising = 1
 
+        #values for rules
         self.r1 = min(self.short, self.falling)
         self.r2 = min(self.close, self.falling)
         self.r3 = min(self.longg, self.falling)
@@ -126,6 +137,7 @@ class R2AFDASH(IR2A):
         self.r8 = min(self.close, self.rising)
         self.r9 = min(self.longg, self.rising)
 
+        #calculate linguistic variables
         self.p2 = sqrt((self.r9 * self.r9))
         self.p1 = sqrt((self.r6 * self.r6) + (self.r8 * self.r8))
         self.z  = sqrt((self.r3 * self.r3) + (self.r5 * self.r5) + (self.r7 * self.r7))
@@ -137,9 +149,9 @@ class R2AFDASH(IR2A):
         print('\033[94m' + f"short = {self.short}, close = {self.close}, falling = {self.falling}, rising = {self.rising}," +
         f" steady = {self.steady}, r1 = {self.r1}, r2 = {self.r2}, r3 = {self.r3}, r4 = {self.r4}," + 
         f" r5 = {self.r5}, r6 = {self.r6}, r7 = {self.r7}, r8 = {self.r8}, r9 = {self.r9}, p2 = {self.p2}," +
-        f" p1 = {self.p1}, z = {self.z}, n1 = {self.n1}, n2 = {self.n2}" + '\033[0m')
+        f" p1 = {self.p1}, z = {self.z}, n1 = {self.n1}, n2 = {self.n2}, output = {output}" + '\033[0m')
 
-        bitrate_estimate = sum(self.bitrates)/len(self.bitrates)
+        bitrate_estimate = self.bitrates[-1]
         print('\033[91m' + f"bitrate_estimate: {bitrate_estimate}" + '\033[0m')
 
         result = output * bitrate_estimate
@@ -149,24 +161,24 @@ class R2AFDASH(IR2A):
 
         self.next_qi = 0
 
-        for i in range(len(self.rates)):
-            if result > self.rates[i]:
+        for i in range(len(self.qi)):
+            if result > self.qi[i]:
                 self.next_qi = i
 
-        if self.next_qi > self.previous_qi:
-            t_60 = self.currDt + (bitrate_estimate / self.rates[self.next_qi] - 1) * 60
+        # if self.next_qi > self.previous_qi:
+        #     t_60 = self.currDt + (bitrate_estimate / self.qi[self.next_qi] - 1) * 60
 
-            if t_60 < self.T:
-                self.next_qi = self.previous_qi
+        #     if t_60 < self.T:
+        #         self.next_qi = self.previous_qi
 
-        elif self.next_qi < self.previous_qi and self.interruption_limit == self.rates[-1]:
-            t_60 = self.currDt + (bitrate_estimate / self.rates[self.next_qi] - 1) * 60
+        # elif self.next_qi < self.previous_qi and self.interruption_limit == self.qi[-1]:
+        #     t_60 = self.currDt + (bitrate_estimate / self.qi[self.next_qi] - 1) * 60
 
-            if t_60 > self.T:
-                t_60 = self.currDt + (bitrate_estimate / self.rates[self.previous_qi] - 1) * 60
+        #     if t_60 > self.T:
+        #         t_60 = self.currDt + (bitrate_estimate / self.qi[self.previous_qi] - 1) * 60
                 
-                if t_60 > self.T:
-                    self.next_qi = self.previous_qi
+        #         if t_60 > self.T:
+        #             self.next_qi = self.previous_qi
 
         self.previous_qi = self.next_qi
 
