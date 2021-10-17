@@ -29,7 +29,7 @@ class R2AFDASH(IR2A):
 
         #variables for calculating throughput
         self.bitrates = []
-        self.time_request = 0
+        self.request_time = 0
 
         #max value of rates
         self.interruption_limit = 0
@@ -68,7 +68,7 @@ class R2AFDASH(IR2A):
         self.r9 = 0
 
     def handle_xml_request(self, msg):
-        self.time_request = perf_counter()
+        self.request_time = perf_counter()
         self.send_down(msg)
 
     def handle_xml_response(self, msg):
@@ -77,17 +77,15 @@ class R2AFDASH(IR2A):
         self.qi = self.parsed_mpd.get_qi()
         self.interruption_limit = self.qi[-1]
 
-        time_download = perf_counter() - self.time_request
+        time_download = perf_counter() - self.request_time
         self.bitrates.append(msg.get_bit_length() / time_download)
 
         self.send_up(msg)
 
     def handle_segment_size_request(self, msg):
-        self.time_request = perf_counter()
+        self.request_time = perf_counter()
 
-        # time to define the segment quality choose to make the request
-
-        # zerar as variaveis para novo ciclo
+        # resetting variable for new segment
         self.short = 0
         self.close = 0
         self.longg = 0
@@ -146,10 +144,10 @@ class R2AFDASH(IR2A):
 
         output = (self.n2 * 0.25 + self.n1 * 0.5 + self.z * 1 + self.p1 * 1.5 + self.p2 * 2) / (self.n2 + self.n1 + self.z + self.p1 + self.p2)
 
-        print('\033[94m' + f"short = {self.short}, close = {self.close}, falling = {self.falling}, rising = {self.rising}," +
-        f" steady = {self.steady}, r1 = {self.r1}, r2 = {self.r2}, r3 = {self.r3}, r4 = {self.r4}," + 
-        f" r5 = {self.r5}, r6 = {self.r6}, r7 = {self.r7}, r8 = {self.r8}, r9 = {self.r9}, p2 = {self.p2}," +
-        f" p1 = {self.p1}, z = {self.z}, n1 = {self.n1}, n2 = {self.n2}, output = {output}" + '\033[0m')
+        print('\033[94m' + f"short = {self.short:.5f}, close = {self.close:.5f}, long = {self.longg:.5f} falling = {self.falling:.5f}," +
+        f" steady = {self.steady:.5f}, rising = {self.rising:.5f}, r1 = {self.r1:.5f}, r2 = {self.r2:.5f}, r3 = {self.r3:.5f}, r4 = {self.r4:.5f}," + 
+        f" r5 = {self.r5:.5f}, r6 = {self.r6:.5f}, r7 = {self.r7:.5f}, r8 = {self.r8:.5f}, r9 = {self.r9:.5f}, p2 = {self.p2:.5f}," +
+        f" p1 = {self.p1:.5f}, z = {self.z:.5f}, n1 = {self.n1:.5f}, n2 = {self.n2:.5f}, output = {output:.5f}" + '\033[0m')
 
         bitrate_estimate = self.bitrates[-1]
         print('\033[91m' + f"bitrate_estimate: {bitrate_estimate}" + '\033[0m')
@@ -165,20 +163,20 @@ class R2AFDASH(IR2A):
             if result > self.qi[i]:
                 self.next_qi = i
 
-        # if self.next_qi > self.previous_qi:
-        #     t_60 = self.currDt + (bitrate_estimate / self.qi[self.next_qi] - 1) * 60
+        if self.next_qi > self.previous_qi:
+            t_60 = self.currDt + (bitrate_estimate / self.qi[self.next_qi] - 1) * 60
 
-        #     if t_60 < self.T:
-        #         self.next_qi = self.previous_qi
+            if t_60 < self.T:
+                self.next_qi = self.previous_qi
 
-        # elif self.next_qi < self.previous_qi and self.interruption_limit == self.qi[-1]:
-        #     t_60 = self.currDt + (bitrate_estimate / self.qi[self.next_qi] - 1) * 60
+        elif self.next_qi < self.previous_qi and self.interruption_limit == self.qi[-1]:
+            t_60 = self.currDt + (bitrate_estimate / self.qi[self.next_qi] - 1) * 60
 
-        #     if t_60 > self.T:
-        #         t_60 = self.currDt + (bitrate_estimate / self.qi[self.previous_qi] - 1) * 60
+            if t_60 > self.T:
+                t_60 = self.currDt + (bitrate_estimate / self.qi[self.previous_qi] - 1) * 60
                 
-        #         if t_60 > self.T:
-        #             self.next_qi = self.previous_qi
+                if t_60 > self.T:
+                    self.next_qi = self.previous_qi
 
         self.previous_qi = self.next_qi
 
@@ -187,8 +185,8 @@ class R2AFDASH(IR2A):
 
     def handle_segment_size_response(self, msg):
         
-        time_download = perf_counter() - self.time_request
-        self.bitrates.append(msg.get_bit_length() / time_download)
+        download_time = perf_counter() - self.request_time
+        self.bitrates.append(msg.get_bit_length() / download_time)
         self.send_up(msg)
 
     def initialize(self):
