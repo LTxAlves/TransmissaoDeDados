@@ -30,15 +30,16 @@ class R2AFDASH(IR2A):
         self.bitrates = []
         self.time_request = 0
         self.rates = [46980, 91917, 135410, 182366, 226106, 270316, 352546, 424520, 537825, 620705, 808057, 1071529, 1312787, 1662809, 2234145, 2617284, 3305118, 3841983, 4242923, 4726737]
+        self.interruption_limit = self.rates[-1]
         self.previous_qi = 0
         self.next_qi = 0
 
         self.iterator = 0
-        self.T = 5
+        self.T = 10
+        self.differential = 0
         self.short = 0
         self.close = 0
         self.longg = 0
-        self.differential = 0
         self.falling = 0
         self.steady = 0
         self.rising = 0
@@ -72,6 +73,8 @@ class R2AFDASH(IR2A):
         self.send_up(msg)
 
     def handle_segment_size_request(self, msg):
+        self.time_request = perf_counter()
+
         # time to define the segment quality choose to make the request
 
         # zerar as variaveis para novo ciclo
@@ -81,50 +84,37 @@ class R2AFDASH(IR2A):
         self.falling = 0
         self.steady = 0
         self.rising = 0
-        self.p2 = 0
-        self.p1 = 0
-        self.z  = 0
-        self.n1 = 0
-        self.n2 = 0
 
         self.currDt = self.get_buffer_estimate()
-        print(f"currDt: {self.currDt}")
+        print('\033[92m' + f"currDt: {self.currDt}" + '\033[0m')
 
         # fuzzification para definir variaveis short, close e long
-        if self.currDt < 2*self.T/3:
+        if self.currDt < 2 * self.T / 3:
             self.short = 1
-        elif self.currDt >= 2*self.T/3 and self.currDt < self.T:
-            self.short = 1 - (1/(self.T/3)*(self.currDt - (2*self.T/3)))
-            self.close = (1/(self.T/3)) * (self.currDt-(2*self.T/3))
-        elif self.currDt >= self.T and self.currDt < 4*self.T:
-            self.close = 1-1/(3*self.T)*(self.currDt-self.T)
-            self.longg = 1/(3*self.T)*(self.currDt-self.T)
+        elif self.currDt < self.T:
+            self.short = 1 - (1 / (self.T / 3)) * (self.currDt - (2 * self.T / 3))
+            self.close = 1 - self.short
+        elif self.currDt < 4 * self.T:
+            self.close = 1 - 1 / (3 * self.T) * (self.currDt - self.T)
+            self.longg = 1 - self.close
         else:
             self.longg = 1
 
-        print("short: " + str(self.short))
-        print("close: " + str(self.close))
-        print("long: " + str(self.longg))
-
         # define differential buffering time
         self.differential = self.get_buffer_differential()
-        print(f"differential: {self.differential}")
-        # fuzzification para definir variaveis falling, steady e rising
+        print('\033[92m' + f"differential: {self.differential}" + '\033[0m')
 
-        if self.differential < -2*self.T/3:
+        # fuzzification para definir variaveis falling, steady e rising
+        if self.differential < -2 * self.T / 3:
             self.falling = 1
-        elif self.differential >= -2*self.T/3 and self.differential < 0:
-            self.falling = 1-(1/(2*self.T / 3)*(self.differential+2*self.T/3))
-            self.steady = 1/(2*self.T/3)*(self.differential+2*self.T/3)
-        elif self.differential < 4*self.T:
-            self.steady = 1-(1/(4*self.T)*self.differential)
-            self.rising = 1/(4*self.T)*self.differential
+        elif self.differential < 0:
+            self.falling = 1 - (1 / (2 * self.T / 3)) * (self.differential + 2 * self.T / 3)
+            self.steady = 1 - self.falling
+        elif self.differential < 4 * self.T:
+            self.steady = 1 - (1 / (4 * self.T) * self.differential)
+            self.rising = 1 - self.steady
         else:
             self.rising = 1
-
-        print("falling: " + str(self.falling))
-        print("steady: " + str(self.steady))
-        print("rising: " + str(self.rising))
 
         self.r1 = min(self.short, self.falling)
         self.r2 = min(self.close, self.falling)
@@ -144,18 +134,18 @@ class R2AFDASH(IR2A):
 
         output = (self.n2 * 0.25 + self.n1 * 0.5 + self.z * 1 + self.p1 * 1.5 + self.p2 * 2) / (self.n2 + self.n1 + self.z + self.p1 + self.p2)
 
-        print(f"short = {self.short}, close = {self.close}, falling = {self.falling}, rising = {self.rising}," +
+        print('\033[94m' + f"short = {self.short}, close = {self.close}, falling = {self.falling}, rising = {self.rising}," +
         f" steady = {self.steady}, r1 = {self.r1}, r2 = {self.r2}, r3 = {self.r3}, r4 = {self.r4}," + 
         f" r5 = {self.r5}, r6 = {self.r6}, r7 = {self.r7}, r8 = {self.r8}, r9 = {self.r9}, p2 = {self.p2}," +
-        f" p1 = {self.p1}, z = {self.z}, n1 = {self.n1}, n2 = {self.n2}")
+        f" p1 = {self.p1}, z = {self.z}, n1 = {self.n1}, n2 = {self.n2}" + '\033[0m')
 
         bitrate_estimate = sum(self.bitrates)/len(self.bitrates)
-        interruption_limit = 4726737
+        print('\033[91m' + f"bitrate_estimate: {bitrate_estimate}" + '\033[0m')
 
         result = output * bitrate_estimate
 
-        if (result > interruption_limit):
-            result = interruption_limit
+        if (result > self.interruption_limit):
+            result = self.interruption_limit
 
         self.next_qi = 0
 
@@ -169,7 +159,7 @@ class R2AFDASH(IR2A):
             if t_60 < self.T:
                 self.next_qi = self.previous_qi
 
-        elif self.next_qi < self.previous_qi and interruption_limit == self.rates[-1]:
+        elif self.next_qi < self.previous_qi and self.interruption_limit == self.rates[-1]:
             t_60 = self.currDt + (bitrate_estimate / self.rates[self.next_qi] - 1) * 60
 
             if t_60 > self.T:
@@ -184,6 +174,9 @@ class R2AFDASH(IR2A):
         self.send_down(msg)
 
     def handle_segment_size_response(self, msg):
+        
+        time_download = perf_counter() - self.time_request
+        self.bitrates.append(msg.get_bit_length() / time_download)
         self.send_up(msg)
 
     def initialize(self):
@@ -198,12 +191,7 @@ class R2AFDASH(IR2A):
         if len(pssab) == 0:
             return 0
 
-        soma = 0
-
-        for element in pssab:
-            soma += float(element)
-
-        return soma/len(pssab)
+        return sum(pssab)/len(pssab)
 
     def get_buffer_differential(self):
         pssab = list(self.whiteboard.get_playback_segment_size_time_at_buffer())
