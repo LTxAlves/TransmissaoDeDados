@@ -28,7 +28,7 @@ class R2AFDASH(IR2A):
         self.qi = []
 
         #variables for calculating throughput
-        self.bitrates = []
+        self.bitrate = 0
         self.request_time = 0
 
         #max value of rates
@@ -38,7 +38,7 @@ class R2AFDASH(IR2A):
         self.previous_qi = 0
         self.next_qi = 0
 
-        self.T = 5
+        self.T = 35
         self.differential = 0
 
         #buffering time linguistic variables
@@ -78,7 +78,7 @@ class R2AFDASH(IR2A):
         self.interruption_limit = self.qi[-1]
 
         time_download = perf_counter() - self.request_time
-        self.bitrates.append(msg.get_bit_length() / time_download)
+        self.bitrate = (msg.get_bit_length() / time_download)
 
         self.send_up(msg)
 
@@ -149,10 +149,9 @@ class R2AFDASH(IR2A):
         f" r5 = {self.r5:.5f}, r6 = {self.r6:.5f}, r7 = {self.r7:.5f}, r8 = {self.r8:.5f}, r9 = {self.r9:.5f}, p2 = {self.p2:.5f}," +
         f" p1 = {self.p1:.5f}, z = {self.z:.5f}, n1 = {self.n1:.5f}, n2 = {self.n2:.5f}, output = {output:.5f}" + '\033[0m')
 
-        bitrate_estimate = self.bitrates[-1]
-        print('\033[91m' + f"bitrate_estimate: {bitrate_estimate}" + '\033[0m')
+        print('\033[91m' + f"bitrate: {self.bitrate}" + '\033[0m')
 
-        result = output * bitrate_estimate
+        result = output * self.bitrate
 
         if (result > self.interruption_limit):
             result = self.interruption_limit
@@ -164,16 +163,16 @@ class R2AFDASH(IR2A):
                 self.next_qi = i
 
         if self.next_qi > self.previous_qi:
-            t_60 = self.currDt + (bitrate_estimate / self.qi[self.next_qi] - 1) * 60
+            t_60 = self.currDt + (self.bitrate / self.qi[self.next_qi] - 1) * 60
 
             if t_60 < self.T:
                 self.next_qi = self.previous_qi
 
         elif self.next_qi < self.previous_qi and self.interruption_limit == self.qi[-1]:
-            t_60 = self.currDt + (bitrate_estimate / self.qi[self.next_qi] - 1) * 60
+            t_60 = self.currDt + (self.bitrate / self.qi[self.next_qi] - 1) * 60
 
             if t_60 > self.T:
-                t_60 = self.currDt + (bitrate_estimate / self.qi[self.previous_qi] - 1) * 60
+                t_60 = self.currDt + (self.bitrate / self.qi[self.previous_qi] - 1) * 60
                 
                 if t_60 > self.T:
                     self.next_qi = self.previous_qi
@@ -186,7 +185,7 @@ class R2AFDASH(IR2A):
     def handle_segment_size_response(self, msg):
         
         download_time = perf_counter() - self.request_time
-        self.bitrates.append(msg.get_bit_length() / download_time)
+        self.bitrate = (msg.get_bit_length() / download_time)
         self.send_up(msg)
 
     def initialize(self):
