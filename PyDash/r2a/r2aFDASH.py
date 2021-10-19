@@ -37,8 +37,8 @@ class R2AFDASH(IR2A):
         #keeping selected QI
         self.previous_qi = 0
         self.next_qi = 0
-
-        self.T = 45
+        self.d = 30
+        self.T = 60
         self.differential = 0
 
         #buffering time linguistic variables
@@ -188,8 +188,8 @@ class R2AFDASH(IR2A):
         
         download_time = perf_counter() - self.request_time
         self.bitrates.append(msg.get_bit_length() / download_time)
-        if len(self.bitrates) > 60:
-            self.bitrates = self.bitrates[-60:] #keep only last 60 values
+        if len(self.bitrates) > self.d:
+            self.bitrates = self.bitrates[-self.d:] #keep only last 60 values
         self.send_up(msg)
 
     def initialize(self):
