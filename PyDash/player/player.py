@@ -249,7 +249,7 @@ class Player(SimpleModule):
     def finalization(self):
 
         with open("./results/results.txt", "w+") as f:
-            f.write(f'Pauses number: {self.pauses_number}')
+            f.write(f'Pauses number: {self.pauses_number}\n')
             print(f'Pauses number: {self.pauses_number}')
 
             if self.pauses_number > 1:
@@ -257,9 +257,9 @@ class Player(SimpleModule):
                 print(f'  >> Average Time Pauses: {round(statistics.mean(pauses), 2)}')
                 print(f'  >> Standard deviation: {round(statistics.stdev(pauses), 2)}')
                 print(f'  >> Variance: {round(statistics.variance(pauses), 2)}')
-                f.write(f'  >> Average Time Pauses: {round(statistics.mean(pauses), 2)}')
-                f.write(f'  >> Standard deviation: {round(statistics.stdev(pauses), 2)}')
-                f.write(f'  >> Variance: {round(statistics.variance(pauses), 2)}')
+                f.write(f'  >> Average Time Pauses: {round(statistics.mean(pauses), 2)}\n')
+                f.write(f'  >> Standard deviation: {round(statistics.stdev(pauses), 2)}\n')
+                f.write(f'  >> Variance: {round(statistics.variance(pauses), 2)}\n')
 
             playback_qi = [i[1] for i in self.playback_qi.get_items()]
 
@@ -267,9 +267,9 @@ class Player(SimpleModule):
                 print(f'Average QI: {round(statistics.mean(playback_qi), 2)}')
                 print(f'  >> Standard deviation: {round(statistics.stdev(playback_qi), 2)}')
                 print(f'  >> Variance: {round(statistics.variance(playback_qi), 2)}')
-                f.write(f'Average QI: {round(statistics.mean(playback_qi), 2)}')
-                f.write(f'  >> Standard deviation: {round(statistics.stdev(playback_qi), 2)}')
-                f.write(f'  >> Variance: {round(statistics.variance(playback_qi), 2)}')
+                f.write(f'Average QI: {round(statistics.mean(playback_qi), 2)}\n')
+                f.write(f'  >> Standard deviation: {round(statistics.stdev(playback_qi), 2)}\n')
+                f.write(f'  >> Variance: {round(statistics.variance(playback_qi), 2)}\n')
 
             diff = []
             for i in range(len(playback_qi) - 1):
@@ -279,9 +279,9 @@ class Player(SimpleModule):
                 print(f'Average QI distance: {round(statistics.mean(diff), 2)}')
                 print(f'  >> Standard deviation: {round(statistics.stdev(diff), 2)}')
                 print(f'  >> Variance: {round(statistics.variance(diff), 2)}')
-                f.write(f'Average QI distance: {round(statistics.mean(diff), 2)}')
-                f.write(f'  >> Standard deviation: {round(statistics.stdev(diff), 2)}')
-                f.write(f'  >> Variance: {round(statistics.variance(diff), 2)}')
+                f.write(f'Average QI distance: {round(statistics.mean(diff), 2)}\n')
+                f.write(f'  >> Standard deviation: {round(statistics.stdev(diff), 2)}\n')
+                f.write(f'  >> Variance: {round(statistics.variance(diff), 2)}\n')
 
             f.close()
 
