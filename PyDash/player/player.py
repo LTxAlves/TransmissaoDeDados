@@ -248,29 +248,42 @@ class Player(SimpleModule):
 
     def finalization(self):
 
-        print(f'Pauses number: {self.pauses_number}')
+        with open("results/results.txt", "w+") as f:
+            f.write(f'Pauses number: {self.pauses_number}')
+            print(f'Pauses number: {self.pauses_number}')
 
-        if self.pauses_number > 1:
-            pauses = [i[1] for i in self.playback_pauses.get_items()]
-            print(f'  >> Average Time Pauses: {round(statistics.mean(pauses), 2)}')
-            print(f'  >> Standard deviation: {round(statistics.stdev(pauses), 2)}')
-            print(f'  >> Variance: {round(statistics.variance(pauses), 2)}')
+            if self.pauses_number > 1:
+                pauses = [i[1] for i in self.playback_pauses.get_items()]
+                print(f'  >> Average Time Pauses: {round(statistics.mean(pauses), 2)}')
+                print(f'  >> Standard deviation: {round(statistics.stdev(pauses), 2)}')
+                print(f'  >> Variance: {round(statistics.variance(pauses), 2)}')
+                f.write(f'  >> Average Time Pauses: {round(statistics.mean(pauses), 2)}')
+                f.write(f'  >> Standard deviation: {round(statistics.stdev(pauses), 2)}')
+                f.write(f'  >> Variance: {round(statistics.variance(pauses), 2)}')
 
-        playback_qi = [i[1] for i in self.playback_qi.get_items()]
+            playback_qi = [i[1] for i in self.playback_qi.get_items()]
 
-        if len(playback_qi) > 1:
-            print(f'Average QI: {round(statistics.mean(playback_qi), 2)}')
-            print(f'  >> Standard deviation: {round(statistics.stdev(playback_qi), 2)}')
-            print(f'  >> Variance: {round(statistics.variance(playback_qi), 2)}')
+            if len(playback_qi) > 1:
+                print(f'Average QI: {round(statistics.mean(playback_qi), 2)}')
+                print(f'  >> Standard deviation: {round(statistics.stdev(playback_qi), 2)}')
+                print(f'  >> Variance: {round(statistics.variance(playback_qi), 2)}')
+                f.write(f'Average QI: {round(statistics.mean(playback_qi), 2)}')
+                f.write(f'  >> Standard deviation: {round(statistics.stdev(playback_qi), 2)}')
+                f.write(f'  >> Variance: {round(statistics.variance(playback_qi), 2)}')
 
-        diff = []
-        for i in range(len(playback_qi) - 1):
-            diff.append(abs(playback_qi[i + 1] - playback_qi[i]))
+            diff = []
+            for i in range(len(playback_qi) - 1):
+                diff.append(abs(playback_qi[i + 1] - playback_qi[i]))
 
-        if len(diff) > 1:
-            print(f'Average QI distance: {round(statistics.mean(diff), 2)}')
-            print(f'  >> Standard deviation: {round(statistics.stdev(diff), 2)}')
-            print(f'  >> Variance: {round(statistics.variance(diff), 2)}')
+            if len(diff) > 1:
+                print(f'Average QI distance: {round(statistics.mean(diff), 2)}')
+                print(f'  >> Standard deviation: {round(statistics.stdev(diff), 2)}')
+                print(f'  >> Variance: {round(statistics.variance(diff), 2)}')
+                f.write(f'Average QI distance: {round(statistics.mean(diff), 2)}')
+                f.write(f'  >> Standard deviation: {round(statistics.stdev(diff), 2)}')
+                f.write(f'  >> Variance: {round(statistics.variance(diff), 2)}')
+
+            f.close()
 
         [os.remove(f) for f in glob.glob('./results/*.png')]
         self.logging_all_statistics()
