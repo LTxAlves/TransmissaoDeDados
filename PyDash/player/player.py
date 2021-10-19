@@ -248,7 +248,7 @@ class Player(SimpleModule):
 
     def finalization(self):
 
-        with open("results/results.txt", "w+") as f:
+        with open("./results/results.txt", "w+") as f:
             f.write(f'Pauses number: {self.pauses_number}')
             print(f'Pauses number: {self.pauses_number}')
 
