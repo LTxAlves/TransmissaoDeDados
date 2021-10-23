@@ -8,7 +8,7 @@
 
 @description: PyDash Project
 
-An implementation of an FDASH Algorithm
+An implementation of an FDASH Algorithm (based on https://github.com/djvergad/dash)
 
 The quality list is obtained with the parameter of handle_xml_response()
 method and the choice is made inside of handle_segment_size_request(),
@@ -37,9 +37,11 @@ class R2AFDASH(IR2A):
         #keeping selected QI
         self.previous_qi = 0
         self.next_qi = 0
+
+        #algorithm's variables
         self.d = 30
         self.T = 60
-        self.differential = 0
+        self.deltaT = 0
 
         #buffering time linguistic variables
         self.short = 0
@@ -93,33 +95,31 @@ class R2AFDASH(IR2A):
         self.steady = 0
         self.rising = 0
 
-        self.currDt = self.get_buffer_estimate()
-        print('\033[92m' + f"currDt: {self.currDt}" + '\033[0m')
+        self.current_ti = self.get_ti_estimate()
 
         # fuzzification para definir variaveis short, close e long
-        if self.currDt < 2 * self.T / 3:
+        if self.current_ti < 2 * self.T / 3:
             self.short = 1
-        elif self.currDt < self.T:
-            self.short = 1 - (1 / (self.T / 3)) * (self.currDt - (2 * self.T / 3))
+        elif self.current_ti < self.T:
+            self.short = 1 - (1 / (self.T / 3)) * (self.current_ti - (2 * self.T / 3))
             self.close = 1 - self.short
-        elif self.currDt < 4 * self.T:
-            self.close = 1 - 1 / (3 * self.T) * (self.currDt - self.T)
+        elif self.current_ti < 4 * self.T:
+            self.close = 1 - 1 / (3 * self.T) * (self.current_ti - self.T)
             self.longg = 1 - self.close
         else:
             self.longg = 1
 
         # define differential buffering time
-        self.differential = self.get_buffer_differential()
-        print('\033[92m' + f"differential: {self.differential}" + '\033[0m')
+        self.deltaT = self.get_current_deltaT()
 
         # fuzzification para definir variaveis falling, steady e rising
-        if self.differential < -2 * self.T / 3:
+        if self.deltaT < -2 * self.T / 3:
             self.falling = 1
-        elif self.differential < 0:
-            self.falling = 1 - (1 / (2 * self.T / 3)) * (self.differential + 2 * self.T / 3)
+        elif self.deltaT < 0:
+            self.falling = 1 - (1 / (2 * self.T / 3)) * (self.deltaT + 2 * self.T / 3)
             self.steady = 1 - self.falling
-        elif self.differential < 4 * self.T:
-            self.steady = 1 - (1 / (4 * self.T) * self.differential)
+        elif self.deltaT < 4 * self.T:
+            self.steady = 1 - (1 / (4 * self.T) * self.deltaT)
             self.rising = 1 - self.steady
         else:
             self.rising = 1
@@ -144,14 +144,7 @@ class R2AFDASH(IR2A):
 
         output = (self.n2 * 0.25 + self.n1 * 0.5 + self.z * 1 + self.p1 * 1.5 + self.p2 * 2) / (self.n2 + self.n1 + self.z + self.p1 + self.p2)
 
-        print('\033[94m' + f"short = {self.short:.5f}, close = {self.close:.5f}, long = {self.longg:.5f} falling = {self.falling:.5f}," +
-        f" steady = {self.steady:.5f}, rising = {self.rising:.5f}, r1 = {self.r1:.5f}, r2 = {self.r2:.5f}, r3 = {self.r3:.5f}, r4 = {self.r4:.5f}," + 
-        f" r5 = {self.r5:.5f}, r6 = {self.r6:.5f}, r7 = {self.r7:.5f}, r8 = {self.r8:.5f}, r9 = {self.r9:.5f}, p2 = {self.p2:.5f}," +
-        f" p1 = {self.p1:.5f}, z = {self.z:.5f}, n1 = {self.n1:.5f}, n2 = {self.n2:.5f}, output = {output:.5f}" + '\033[0m')
-
         bitrateEstimate = sum(self.bitrates)/len(self.bitrates)
-
-        print('\033[91m' + f"bitrate estimate: {bitrateEstimate}" + '\033[0m')
 
         result = output * bitrateEstimate
 
@@ -165,18 +158,18 @@ class R2AFDASH(IR2A):
                 self.next_qi = i
 
         if self.next_qi > self.previous_qi:
-            t_60 = self.currDt + (bitrateEstimate / self.qi[self.next_qi] - 1) * 60
+            t_buffer_last_60 = self.current_ti + (bitrateEstimate / self.qi[self.next_qi] - 1) * 60
 
-            if t_60 < self.T:
+            if t_buffer_last_60 < self.T:
                 self.next_qi = self.previous_qi
 
         elif self.next_qi < self.previous_qi and self.interruption_limit == self.qi[-1]:
-            t_60 = self.currDt + (bitrateEstimate / self.qi[self.next_qi] - 1) * 60
+            t_buffer_last_60 = self.current_ti + (bitrateEstimate / self.qi[self.next_qi] - 1) * 60
 
-            if t_60 > self.T:
-                t_60 = self.currDt + (bitrateEstimate / self.qi[self.previous_qi] - 1) * 60
+            if t_buffer_last_60 > self.T:
+                t_buffer_last_60 = self.current_ti + (bitrateEstimate / self.qi[self.previous_qi] - 1) * 60
                 
-                if t_60 > self.T:
+                if t_buffer_last_60 > self.T:
                     self.next_qi = self.previous_qi
 
         self.previous_qi = self.next_qi
@@ -189,7 +182,7 @@ class R2AFDASH(IR2A):
         download_time = perf_counter() - self.request_time
         self.bitrates.append(msg.get_bit_length() / download_time)
         if len(self.bitrates) > self.d:
-            self.bitrates = self.bitrates[-self.d:] #keep only last 60 values
+            self.bitrates = self.bitrates[-self.d:] #keep only last d values
         self.send_up(msg)
 
     def initialize(self):
@@ -198,7 +191,7 @@ class R2AFDASH(IR2A):
     def finalization(self):
         pass
 
-    def get_buffer_estimate(self):
+    def get_ti_estimate(self):
         pssab = list(self.whiteboard.get_playback_segment_size_time_at_buffer())
 
         if len(pssab) == 0:
@@ -206,7 +199,7 @@ class R2AFDASH(IR2A):
 
         return sum(pssab)/len(pssab)
 
-    def get_buffer_differential(self):
+    def get_current_deltaT(self):
         pssab = list(self.whiteboard.get_playback_segment_size_time_at_buffer())
 
         if (len(pssab) < 2):
